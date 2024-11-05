@@ -17,8 +17,12 @@ pub fn build(b: *std.Build) !void {
     const use_double_precision = b.option(bool, "double", "All data will be stored as double values") orelse false;
     const assimp = b.dependency("assimp", .{});
 
+    //Set the output directory to use a per-target folder
     const joined_target_str = try std.mem.concat(b.allocator, u8, &.{ @tagName(target.result.cpu.arch), "_", @tagName(target.result.os.tag), "_", @tagName(target.result.abi) });
-    defer b.allocator.free(joined_target_str);
+    b.lib_dir = try std.fs.path.join(b.allocator, &.{ b.install_path, joined_target_str, "lib" });
+    b.h_dir = try std.fs.path.join(b.allocator, &.{ b.install_path, joined_target_str, "include" });
+    b.exe_dir = try std.fs.path.join(b.allocator, &.{ b.install_path, joined_target_str, "bin" });
+    b.dest_dir = try std.fs.path.join(b.allocator, &.{ b.install_path, joined_target_str });
 
     const lib = b.addStaticLibrary(.{
         .name = "assimp",
@@ -140,29 +144,18 @@ pub fn build(b: *std.Build) !void {
         lib.defineCMacro(define_exporter, null);
     }
 
-    const assimp_lib_path = try std.fs.path.join(b.allocator, &.{ joined_target_str, "assimp.lib" });
-    defer b.allocator.free(assimp_lib_path);
-    const libArtifact = b.addInstallLibFile(lib.getEmittedBin(), assimp_lib_path);
-    libArtifact.step.dependOn(&lib.step);
-    b.getInstallStep().dependOn(&libArtifact.step);
+    b.installArtifact(lib);
 
-    if (lib.producesPdbFile()) {
-        const assimp_pdb_path = try std.fs.path.join(b.allocator, &.{ joined_target_str, "assimp.pdb" });
-        defer b.allocator.free(assimp_pdb_path);
-        const pdbArtifact = b.addInstallLibFile(lib.getEmittedPdb(), assimp_pdb_path);
-        pdbArtifact.step.dependOn(&lib.step);
-        b.getInstallStep().dependOn(&pdbArtifact.step);
-    }
-
-    const zig_assimp_license_target = try std.fs.path.join(b.allocator, &.{ joined_target_str, "ZIG_ASSIMP_LICENSE" });
-    defer b.allocator.free(zig_assimp_license_target);
-    b.installLibFile("LICENCE", zig_assimp_license_target);
-
-    const assimp_license_target = try std.fs.path.join(b.allocator, &.{ joined_target_str, "ASSIMP_LICENSE" });
-    defer b.allocator.free(assimp_license_target);
-    const addLicense = b.addInstallLibFile(assimp.path("LICENSE"), assimp_license_target);
-    addLicense.step.dependOn(&lib.step);
-    b.getInstallStep().dependOn(&addLicense.step);
+    lib.installHeader(b.path("LICENCE"), "../lib/ZIG_ASSIMP_LICENSE");
+    lib.installHeader(assimp.path("LICENSE"), "../lib/ASSIMP_LICENSE");
+    lib.installHeader(assimp.path("test/models-nonbsd/Ogre/OgreSDK/LICENSE"), "../lib/OGRESDK_LICENSE");
+    lib.installHeader(assimp.path("contrib/zlib/LICENSE"), "../lib/zlib_LICENSE");
+    lib.installHeader(assimp.path("contrib/utf8cpp/doc/LICENSE"), "../lib/utf8cpp_LICENSE");
+    lib.installHeader(assimp.path("contrib/rapidjson/license.txt"), "../lib/rapidjson_LICENSE.txt");
+    lib.installHeader(assimp.path("contrib/poly2tri/LICENSE"), "../lib/poly2tri_LICENSE");
+    lib.installHeader(assimp.path("contrib/openddlparser/LICENSE"), "../lib/openddlparser_LICENSE");
+    lib.installHeader(assimp.path("contrib/draco/LICENSE"), "../lib/draco_LICENSE");
+    lib.installHeader(assimp.path("contrib/clipper/License.txt"), "../lib/clipper_LICENSE.txt");
 }
 
 const unsupported_formats = [_][]const u8{
